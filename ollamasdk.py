@@ -1,47 +1,80 @@
 import ollama
-import re
 
-# 1. 定义可执行函数
-def add(a, b):
-    return a + b
+function_schemas = {
+    "add": {
+        "type": "function",
+        "function": {
+            "name": "add",
+            "description": "Add two numbers together",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "a": {"type": "integer", "description": "The first number"},
+                    "b": {"type": "integer", "description": "The second number"}
+                },
+                "required": ["a", "b"]
+            }
+        }
+    }
+}
 
-# 2. 调用 ollama（你已经写好的）
 def call_ollama_sdk(prompt):
     response = ollama.chat(
-        model='gemma3:1b ',
+        model='gemma3:1b',  #小模型用来选出函数就行
         messages=[{'role': 'user', 'content': prompt}]
     )
     return response['message']['content']
 
-# 3. 核心：正则匹配 + 提取 + 调用！
-def parse_and_execute(llm_output):
-    #print(f"大模型返回的原始字符串: {llm_output}")
+def add(a: int, b: int) -> int:
+    """
+    Add two numbers together
     
-    # 正则表达式匹配 ADD(a,b)
-    pattern = r'ADD\(\s*(\d+)\s*,\s*(\d+)\s*\)'
-    match = re.search(pattern, llm_output)
+    Args:
+        a: The first number
+        b: The second number
     
-    if match:
-        # 提取参数
-        a_str = match.group(1)
-        b_str = match.group(2)
-        a = int(a_str)
-        b = int(b_str)
-        
-        #print(f"成功提取: 函数 ADD, 参数 a={a}, b={b}")
-        
-        # 调用函数
-        result = add(a, b)
-        print(f"执行结果: {a} + {b} = {result}")
-        return result
-    else:
-        print("匹配失败！没有找到 ADD(a,b) 格式")
-        return None
+    Returns:
+        The sum of a and b
+    """
+    return a + b
 
-# 4. 完整测试
+def call_ollama_with_functions():
+    while True:
+        messages = [{'role': 'user', 'content': msg}]
+        tool_name = call_ollama_sdk(msg + ",请在如下函数中选择一个最合适的返回，仅返回如下:add、sub中一个")
+        tool_name = tool_name.strip().lower()
+        #print("工具名:", tool_name)
+        
+        # ✅ 2. 核心：根据tool_name字符串，从function_schemas里拿出对应的schema，放到tools列表！
+        tools = []
+        if tool_name in function_schemas:
+            tools.append(function_schemas[tool_name])  # ✅ 字符串映射到schema并添加！
+            #print(f"成功把 {tool_name} 加入 tools 列表，现在 tools = {tools}")
+            
+        response = ollama.chat(
+            model='qwen3:4b',  # 需要用支持 tool calling 的模型
+            messages=messages,
+            tools=tools  # 动态生成的tools列表！
+        )
+        
+        #print("完整响应:", response)
+        
+        if response.message.tool_calls:
+            for tool_call in response.message.tool_calls:
+                print(f"工具调用: {tool_call.function.name}")
+                print(f"参数: {tool_call.function.arguments}")
+                
+                # 直接调用函数
+                func = globals()[tool_call.function.name]
+                result = func(**tool_call.function.arguments)
+                print(f"执行结果: {result}")
+                print("解决思路"+call_ollama_sdk("用一段话说明问题的思路"+msg))
+                return result
+
 if __name__ == "__main__":
-    user_prompt = "请计算32+21，给出计算表达式，输出结果仅显示ADD(a,b)的形式"
-    llm_output = call_ollama_sdk(user_prompt)
-    
-    # 解析并执行
-    parse_and_execute(llm_output)
+    while True:
+        msg = input("你: ")  # ✅ 从终端输入！
+        if msg.lower() in ['quit', 'exit', 'q']:  # 支持退出
+            print("再见！")
+            break
+        call_ollama_with_functions()
