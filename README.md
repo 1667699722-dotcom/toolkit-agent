@@ -90,9 +90,11 @@ The entire process is transparent to the user — you just ask questions, and th
 
 ## 🛠️ 内置工具 / Built-in Tools
 
+### 数学计算 / Math
+
 | 工具 / Tool | 说明 / Description |
 |---|---|
-| `add(a, b)` | 加法 / Addition |
+| `add(arr)` | 数组求和（支持任意多个数）/ Sum any number of values |
 | `sub(a, b)` | 减法 / Subtraction |
 | `mul(a, b)` | 乘法 / Multiplication |
 | `div(a, b)` | 除法 / Division |
@@ -100,6 +102,16 @@ The entire process is transparent to the user — you just ask questions, and th
 | `pow(a, b)` | 幂运算 / Power |
 | `log(a)` | 自然对数 / Natural logarithm |
 | `sort_array(arr, descending)` | 数组排序 / Sort array |
+
+### 文件与代码执行 / File & Code Interpreter
+
+| 工具 / Tool | 说明 / Description |
+|---|---|
+| `write_file(filename, content)` | 写文件到 `workspace/` / Write file to `workspace/` |
+| `read_file(filename)` | 从 `workspace/` 读文件 / Read file from `workspace/` |
+| `run_python(filename)` | 执行 Python 脚本（子进程，有超时保护）/ Execute Python script in subprocess with timeout |
+
+> **重要**：脚本内部可以直接 `from tools import add, sqrt, sort_array, ...` 来复用已有的工具函数，无需重写。
 
 ---
 
@@ -189,46 +201,45 @@ python3 toolkit_agent.py
 
 ## 🚀 使用示例 / Usage Examples
 
-### 中文
+### 示例 1：多步数学计算 / Multi-step math
 
 ```
-✅ 已连接 https://api.deepseek.com/v1，使用模型: deepseek-chat
-   输入 quit/exit/q 退出
-
-你: 100加200，再把结果乘以3
+你: 100加200，再把结果乘以3，最后开平方
 第 1 轮
-  [工具调用] add({'a': 100, 'b': 200})
-  [执行结果] 300
+  [工具调用] add({'arr': [100, 200, 300, 400]})
+  [执行结果] 1000
 第 2 轮
-  [工具调用] mul({'a': 300, 'b': 3})
-  [执行结果] 900
-AI: 计算结果是 900。
+  [工具调用] mul({'a': 900, 'b': 3})
+  [执行结果] 2700
+第 3 轮
+  [工具调用] sqrt({'a': 2700})
+  [执行结果] 51.96152422706632
+AI: 最终结果约为 51.96。
+```
 
-你: 把 [5, 2, 8, 1, 9, 3] 从大到小排序
+### 示例 2：数组排序与求和 / Array operations
+
+```
+你: 把 [5, 2, 8, 1, 9, 3] 从大到小排序，然后求和
   [工具调用] sort_array({'arr': [5, 2, 8, 1, 9, 3], 'descending': True})
   [执行结果] [9, 8, 5, 3, 2, 1]
-AI: 排序后的结果是 [9, 8, 5, 3, 2, 1]
+  [工具调用] add({'arr': [9, 8, 5, 3, 2, 1]})
+  [执行结果] 28
+AI: 排序后是 [9, 8, 5, 3, 2, 1]，总和是 28。
 ```
 
-### English
+### 示例 3：Code Interpreter（写脚本并执行）
 
 ```
-✅ Connected to https://api.deepseek.com/v1, using model: deepseek-chat
-   Type quit/exit/q to exit
-
-You: 100 plus 200, then multiply the result by 3
-Round 1
-  [Tool call] add({'a': 100, 'b': 200})
-  [Result] 300
-Round 2
-  [Tool call] mul({'a': 300, 'b': 3})
-  [Result] 900
-AI: The result is 900.
-
-You: sort [5, 2, 8, 1, 9, 3] from largest to smallest
-  [Tool call] sort_array({'arr': [5, 2, 8, 1, 9, 3], 'descending': True})
-  [Result] [9, 8, 5, 3, 2, 1]
-AI: Sorted result is [9, 8, 5, 3, 2, 1]
+你: 给我计算 sin(3) + cos(3k)*2，k 从 1 到 10 的和
+第 1 轮
+  [工具调用] write_file({'filename': 'calc_sum.py', 'content': 'import math\n\ntotal = 0\nfor k in range(1, 11):\n    term = math.sin(3) + math.cos(3*k) * 2\n    total += term\nprint(f"k=1..10 的和 = {total:.10f}")\n'})
+  [执行结果] File written: calc_sum.py (xxx chars, saved in workspace/)
+第 2 轮
+  [工具调用] run_python({'filename': 'calc_sum.py'})
+  [执行结果] [ran calc_sum.py — OK]
+k=1..10 的和 = 0.4953854217
+AI: 最终求和结果约为 0.495。脚本已保存在 workspace/calc_sum.py。
 ```
 
 ---
@@ -328,7 +339,9 @@ That's it — no changes needed in `toolkit_agent.py`.
 ```
 toolkit-agent/
 ├── toolkit_agent.py    # 主程序：与大模型对话 / Main: chat with LLM
-├── tools.py           # 工具模块：函数 + schema / Tools module: functions + schema
+├── tools.py           # 工具模块：函数 + schema + 映射表 / Tools module: functions + schemas + function map
+├── run.sh             # 一键启动脚本 / One-click startup script (API key here)
+├── workspace/         # 脚本读写工作区 / Workspace for write_file / run_python
 └── README.md           # 本文件 / This file
 ```
 
