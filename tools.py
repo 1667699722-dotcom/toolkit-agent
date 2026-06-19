@@ -13,6 +13,7 @@ import os
 import subprocess
 import sys
 import hashlib
+import hmac
 
 # ========== 工作区路径（文件读写/脚本执行都限制在这里） ==========
 WORKSPACE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workspace")
@@ -158,6 +159,27 @@ TOOLS_SCHEMA = [
     {
         "type": "function",
         "function": {
+            "name": "compare_strings",
+            "description": "Compare two strings for equality. Uses constant-time comparison to prevent timing attacks (safe for passwords/keys).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "a": {
+                        "type": "string",
+                        "description": "First string to compare"
+                    },
+                    "b": {
+                        "type": "string",
+                        "description": "Second string to compare"
+                    }
+                },
+                "required": ["a", "b"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "hash_string",
             "description": "Calculate hash of a string. Supports md5, sha1, sha256, sha512 (default is sha256).",
             "parameters": {
@@ -283,6 +305,10 @@ def hash_string(text: str, algorithm: str = "sha256") -> str:
     hash_obj.update(text.encode("utf-8"))
     return hash_obj.hexdigest()
 
+def compare_strings(a: str, b: str) -> bool:
+    """Compare two strings using constant-time comparison."""
+    return hmac.compare_digest(a, b)
+
 def write_file(filename: str, content: str) -> str:
     """Write content to a file in workspace/. Returns a confirmation message."""
     path = _safe_path(filename)
@@ -337,6 +363,7 @@ FUNCTIONS = {
     "log": log,
     "sort_array": sort_array,
     "hash_string": hash_string,
+    "compare_strings": compare_strings,
     "write_file": write_file,
     "read_file": read_file,
     "run_python": run_python,
