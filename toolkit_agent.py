@@ -30,7 +30,7 @@ def chat(user_input: str):
     max_rounds = 100  # 防止无限循环
     n=1
     for _ in range(max_rounds):
-        print(f"第 {n} 轮")  
+         
         # 调用模型：让它决定是否需要调用工具
         response = client.chat.completions.create(
             model=MODEL,
@@ -43,7 +43,7 @@ def chat(user_input: str):
         # 如果模型没调用工具 → 直接回答，结束循环
         if not response_message.tool_calls:
             return response_message.content
-
+        print(f"第 {n} 轮") 
         # 有工具调用 → 先把模型的调用请求加入对话历史
         messages.append(response_message)
         #print(f"模型回复: {response_message.tool_calls}")
