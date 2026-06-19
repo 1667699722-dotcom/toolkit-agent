@@ -12,6 +12,7 @@ import math
 import os
 import subprocess
 import sys
+import hashlib
 
 # ========== 工作区路径（文件读写/脚本执行都限制在这里） ==========
 WORKSPACE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workspace")
@@ -157,6 +158,28 @@ TOOLS_SCHEMA = [
     {
         "type": "function",
         "function": {
+            "name": "hash_string",
+            "description": "Calculate hash of a string. Supports md5, sha1, sha256, sha512 (default is sha256).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "The string to hash"
+                    },
+                    "algorithm": {
+                        "type": "string",
+                        "description": "Hash algorithm to use (md5, sha1, sha256, sha512). Default: sha256",
+                        "enum": ["md5", "sha1", "sha256", "sha512"]
+                    }
+                },
+                "required": ["text"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "write_file",
             "description": "Write content to a file in the workspace directory. If the file exists, it will be overwritten. Use this to save data, notes, or Python scripts. IMPORTANT: When writing Python code can import reusable functions from tools via 'from tools import <function_name>'. Pick appropriate functions from tools.FUNCTIONS — e.g. add, sub, mul, div, sqrt, pow, log, sort_array, write_file, read_file, run_python. Reuse them instead of reimplementing.",
             "parameters": {
@@ -254,6 +277,12 @@ def sort_array(arr: list, descending: bool = False) -> list:
     """Sort an array of numbers in ascending (default) or descending order."""
     return sorted(arr, reverse=descending)
 
+def hash_string(text: str, algorithm: str = "sha256") -> str:
+    """Calculate hash of a string."""
+    hash_obj = hashlib.new(algorithm)
+    hash_obj.update(text.encode("utf-8"))
+    return hash_obj.hexdigest()
+
 def write_file(filename: str, content: str) -> str:
     """Write content to a file in workspace/. Returns a confirmation message."""
     path = _safe_path(filename)
@@ -307,6 +336,7 @@ FUNCTIONS = {
     "pow": pow,
     "log": log,
     "sort_array": sort_array,
+    "hash_string": hash_string,
     "write_file": write_file,
     "read_file": read_file,
     "run_python": run_python,
