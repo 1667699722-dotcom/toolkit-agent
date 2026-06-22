@@ -175,8 +175,6 @@ if __name__ == "__main__":
     initialize_character()
 
     # 启动界面简洁干净
-    print("\n")
-
     while True:
         user_msg = input("你: ")
         if user_msg.lower() in ["quit", "exit", "q"]:
