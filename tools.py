@@ -943,9 +943,7 @@ def generate_music_streaming(
     from magenta_rt import audio, paths
     from magenta_rt.mlx import system as mlx_system
     
-    # Set MAGENTA_HOME to our workspace directory
-    project_root = os.path.dirname(os.path.abspath(__file__))
-    magenta_home = os.path.join(project_root, "workspace")
+    magenta_home = os.path.expanduser("~/Documents/Magenta")
     os.environ["MAGENTA_HOME"] = magenta_home
     
     # Initialize the model
