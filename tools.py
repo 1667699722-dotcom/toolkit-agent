@@ -465,7 +465,7 @@ TOOLS_SCHEMA = [
                     },
                     "loops": {
                         "type": "integer",
-                        "description": "Number of times to loop (0 = once, -1 = infinite, default: 0)."
+                        "description": "Number of times to loop (0 = once, -1 = infinite, default: -1)."
                     },
                     "volume": {
                         "type": "number",
@@ -933,6 +933,13 @@ def generate_music_streaming(
   """
   try:
     import os
+    # 屏蔽 TensorFlow 和 Magenta 的日志信息
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+    import logging
+    logging.getLogger('tensorflow').setLevel(logging.ERROR)
+    logging.getLogger('magenta_rt').setLevel(logging.ERROR)
+    
     from magenta_rt import audio, paths
     from magenta_rt.mlx import system as mlx_system
     
@@ -959,7 +966,7 @@ def generate_music_streaming(
         state=state
       )
       segments.append(wav)
-      print(f"Generated segment {i+1}/{num_segments}")
+      #print(f"Generated segment {i+1}/{num_segments}")
     
     # Concatenate with crossfade
     if len(segments) == 1:
@@ -987,6 +994,8 @@ def _ensure_pygame_initialized():
     global _pygame_initialized
     if not _pygame_initialized:
         try:
+            # 屏蔽 pygame 的欢迎信息
+            os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
             import pygame
             pygame.mixer.init()
             _pygame_initialized = True
@@ -997,7 +1006,7 @@ def _ensure_pygame_initialized():
     return True, None
 
 
-def play_music(filename: str, loops: int = 0, volume: float = 1.0) -> str:
+def play_music(filename: str, loops: int = -1, volume: float = 1.0) -> str:
     """使用 pygame 播放音乐（支持 WAV、MP3、OGG 等格式）"""
     # 初始化 pygame
     ok, err = _ensure_pygame_initialized()

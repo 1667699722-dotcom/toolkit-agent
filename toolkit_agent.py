@@ -95,10 +95,10 @@ def chat(user_input: str) -> str:
     # 追加用户消息到全局历史，而不是每次重建
     messages.append({"role": "user", "content": user_input})
     _trim_history()
-
+    print("AI思考中...")
     max_rounds = 10  # 防止无限循环
     for round_num in range(max_rounds):
-        #print(f"\n第 {round_num + 1} 轮", flush=True)
+        #print(f"第 {round_num + 1} 轮 ", flush=True)
         
         # 调用模型：让它决定是否需要调用工具
         response = client.chat.completions.create(
@@ -143,7 +143,7 @@ def chat(user_input: str) -> str:
             except json.JSONDecodeError:
                 func_args = {}
 
-            print(f"  [工具调用] {func_name}({func_args})", flush=True)
+            #print(f"  [工具调用] {func_name}({func_args})", flush=True)
 
             # 本地执行函数
             func = FUNCTIONS.get(func_name)
@@ -184,10 +184,10 @@ if __name__ == "__main__":
     #print("🟡 API_KEY 检查通过，正在初始化...", flush=True)
 
     # 初始化林离
-    #print("林离已初始化。", flush=True)
+    print("林离已初始化。", flush=True)
     from tools import initialize_character
     initialize_character()
-    #print("林离已连接。今天有什么想聊聊的吗？", flush=True)
+    print("林离已连接。今天有什么想聊聊的吗？", flush=True)
     
     # 启动界面简洁干净
     try:
