@@ -16,6 +16,10 @@ import hashlib
 import hmac
 import json
 from datetime import datetime
+import numpy as np
+
+# 全局 pygame 初始化状态
+_pygame_initialized = False
 
 # ========== 工作区路径（文件读写/脚本执行都限制在这里） ==========
 WORKSPACE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workspace")
@@ -369,6 +373,158 @@ TOOLS_SCHEMA = [
                 "properties": {}
             }
         }
+    },
+    #{
+    #    "type": "function",
+    #    "function": {
+    #        "name": "generate_music",
+    #        "description": "Generate music using Magenta RealTime 2 (MLX on Apple Silicon). Saves the audio as WAV file in workspace.",
+    #        "parameters": {
+    #            "type": "object",
+    #            "properties": {
+    #                "prompt": {
+    #                    "type": "string",
+    #                    "description": "Text prompt describing the music style (e.g., 'disco funk', 'ambient pads')."
+    #                },
+    #                "duration": {
+    #                    "type": "number",
+    #                    "description": "Music duration in seconds (default: 4.0)."
+    #                },
+    #                "filename": {
+    #                    "type": "string",
+    #                    "description": "Output WAV filename (default: 'output_music.wav')."
+    #                },
+    #                "model": {
+    #                    "type": "string",
+    #                    "description": "Model to use: 'mrt2_small' (fast, any Apple Silicon) or 'mrt2_base' (high-quality, M3 Pro/M2 Max+). Default: 'mrt2_small'."
+    #                }
+    #            },
+    #            "required": ["prompt"]
+    #        }
+    #    }
+    #},
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_music_streaming",
+            "description": "Generate long-form music using Magenta RealTime 2 with streaming and crossfade. Generates in segments and concatenates smoothly.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "prompt": {
+                        "type": "string",
+                        "description": "Text prompt describing music style (e.g., 'soft piano')."
+                    },
+                    "duration": {
+                        "type": "number",
+                        "description": "Total duration of music in seconds (default: 16.0)."
+                    },
+                    "segment_duration": {
+                        "type": "number",
+                        "description": "Duration of each segment in seconds (default: 4.0)."
+                    },
+                    "crossfade_duration": {
+                        "type": "number",
+                        "description": "Crossfade duration between segments in seconds (default: 0.3)."
+                    },
+                    "filename": {
+                        "type": "string",
+                        "description": "Output WAV filename (default: 'long_music.wav')."
+                    },
+                    "model": {
+                        "type": "string",
+                        "description": "Model to use: 'mrt2_small' or 'mrt2_base' (default: 'mrt2_small')."
+                    }
+                },
+                "required": ["prompt"]
+            }
+        }
+    },
+    #{
+    #    "type": "function",
+    #    "function": {
+    #        "name": "init_music_models",
+    #        "description": "Initialize and download Magenta RealTime 2 models (only needs to run once).",
+    #        "parameters": {
+    #            "type": "object",
+    #           "properties": {}
+    #        }
+    #    }
+    #},
+    {
+        "type": "function",
+        "function": {
+            "name": "play_music",
+            "description": "Play music from workspace using pygame. Supports WAV, MP3, OGG, etc.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "type": "string",
+                        "description": "Audio filename from workspace (e.g., 'output_music.wav')."
+                    },
+                    "loops": {
+                        "type": "integer",
+                        "description": "Number of times to loop (0 = once, -1 = infinite, default: 0)."
+                    },
+                    "volume": {
+                        "type": "number",
+                        "description": "Volume level (0.0 to 1.0, default: 1.0)."
+                    }
+                },
+                "required": ["filename"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "pause_music",
+            "description": "Pause currently playing music.",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "unpause_music",
+            "description": "Resume paused music.",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "stop_music",
+            "description": "Stop music playback.",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_music_volume",
+            "description": "Set music playback volume.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "volume": {
+                        "type": "number",
+                        "description": "Volume level (0.0 to 1.0)."
+                    }
+                },
+                "required": ["volume"]
+            }
+        }
     }
 ]
 
@@ -631,7 +787,301 @@ def daily_greeting() -> str:
         return greeting
 
 
-# 函数映射表：函数名 -> 函数对象（供动态调用）
+# ========== 音乐生成工具（Magenta RealTime 2） ==========
+#def init_music_models() -> str:
+    """初始化并下载 Magenta RealTime 2 模型（只需要运行一次）"""
+    try:
+        # 设置模型和输出目录环境变量（MAGENTA_HOME 应该包含 magenta-rt-v2 子目录）
+        workspace_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workspace")
+        env = os.environ.copy()
+        env["MAGENTA_HOME"] = workspace_dir
+        
+        # 调用 mrt 命令行工具初始化和下载模型
+        result1 = subprocess.run(
+            ["mrt", "models", "init"],
+            capture_output=True,
+            text=True,
+            timeout=300,
+            env=env
+        )
+        result2 = subprocess.run(
+            ["mrt", "models", "download"],
+            capture_output=True,
+            text=True,
+            timeout=600,
+            env=env
+        )
+        output = result1.stdout + result2.stdout
+        if result1.stderr or result2.stderr:
+            output += "\n--- stderr ---\n" + result1.stderr + result2.stderr
+        return f"🎵 模型初始化完成！\n{output}"
+    except Exception as e:
+        import traceback
+        return f"❌ 模型初始化失败：{str(e)}\n{traceback.format_exc()}"
+
+
+#def generate_music(prompt: str, duration: float = 4.0, filename: str = "output_music.wav", model: str = "mrt2_small") -> str:
+#    """使用 Magenta RealTime 2 生成音乐（Apple Silicon MLX 加速）"""
+#    try:
+#        safe_filename = os.path.basename(filename)  # 防止路径穿越
+#        if not safe_filename.endswith(".wav"):
+#            safe_filename += ".wav"
+#        output_path = _safe_path(safe_filename)
+#        
+#        # 设置模型和输出目录环境变量
+#        workspace_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workspace")
+#        env = os.environ.copy()
+#        env["MAGENTA_HOME"] = workspace_dir  # 关键：让输出和模型都在我们的项目目录下
+#        
+#        # 使用 mrt 命令行工具生成音乐
+#        result = subprocess.run(
+#            ["mrt", "mlx", "generate", "--prompt", prompt, "--duration", str(duration), "--model", model],
+#            capture_output=True,
+#            text=True,
+#            timeout=600,
+#            env=env
+#        )
+#        
+#        output = result.stdout
+#        if result.stderr:
+#            output += "\n--- stderr ---\n" + result.stderr
+#        
+#        # 默认输出文件名格式
+#        default_output_name = f"output_audio_mlx_{model}.wav"
+#        default_output_path = os.path.join(workspace_dir, "magenta-rt-v2", "outputs", default_output_name)
+#        
+#        if result.returncode == 0 and os.path.exists(default_output_path):
+#            # 移动/重命名文件到用户指定的文件名
+#            import shutil
+#            shutil.move(default_output_path, output_path)
+#            return f"🎵 音乐生成成功！\n文件已保存：{safe_filename}\n{output}"
+#        else:
+#            return f"❌ 音乐生成失败：{output}"
+#    except Exception as e:
+#        import traceback
+#        return f"❌ 音乐生成出错：{str(e)}\n{traceback.format_exc()}"
+
+
+def concatenate_with_crossfade(waveforms, crossfade_seconds=0.3):
+  """
+  Concatenate multiple Waveform objects with smooth crossfade between segments.
+  
+  Args:
+    waveforms: List of magenta_rt.audio.Waveform objects.
+    crossfade_seconds: Duration of crossfade in seconds.
+  
+  Returns:
+    Concatenated Waveform object with crossfades.
+  """
+  from magenta_rt import audio
+  
+  if not waveforms:
+    raise ValueError("No waveforms to concatenate.")
+  if len(waveforms) == 1:
+    return waveforms[0]
+  
+  sample_rate = waveforms[0].sample_rate
+  num_channels = waveforms[0].num_channels
+  
+  crossfade_samples = int(crossfade_seconds * sample_rate)
+  
+  result = waveforms[0].samples
+  for i in range(1, len(waveforms)):
+    current = waveforms[i].samples
+    
+    if crossfade_samples > 0:
+      crossfade_len = min(crossfade_samples, result.shape[0], current.shape[0])
+      
+      if crossfade_len > 0:
+        ramp = audio.crossfade_ramp(crossfade_len, "eqpower")
+        ramp = ramp.reshape(-1, 1)
+        crossfade_end = result[-crossfade_len:] * (1 - ramp)
+        crossfade_start = current[:crossfade_len] * ramp
+        
+        middle = crossfade_end + crossfade_start
+        
+        result = np.concatenate([result[:-crossfade_len], middle, current[crossfade_len:]], axis=0)
+      else:
+        result = np.concatenate([result, current], axis=0)
+    else:
+      result = np.concatenate([result, current], axis=0)
+  
+  return audio.Waveform(result, sample_rate)
+
+
+def generate_music_streaming(
+  prompt: str, 
+  duration: float = 16.0, 
+  segment_duration: float = 4.0, 
+  crossfade_duration: float = 0.3, 
+  filename: str = "long_music.wav", 
+  model: str = "mrt2_small"
+) -> str:
+  """
+  Generate long-form music using Magenta RealTime 2 with streaming and crossfade.
+  
+  Args:
+    prompt: Text prompt describing music style.
+    duration: Total duration in seconds.
+    segment_duration: Duration of each segment in seconds.
+    crossfade_duration: Crossfade duration between segments in seconds.
+    filename: Output filename.
+    model: Model to use ('mrt2_small' or 'mrt2_base').
+  
+  Returns:
+    Success or error message.
+  """
+  try:
+    import os
+    from magenta_rt import audio, paths
+    from magenta_rt.mlx import system as mlx_system
+    
+    # Set MAGENTA_HOME to our workspace directory
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    magenta_home = os.path.join(project_root, "workspace")
+    os.environ["MAGENTA_HOME"] = magenta_home
+    
+    # Initialize the model
+    mrt = mlx_system.MagentaRT2SystemMlxfn(size=model)
+    embedding = mrt.embed_style(prompt, use_mapper=True)
+    
+    # Calculate number of segments
+    num_segments = max(1, int(duration / segment_duration))
+    frames_per_segment = int(segment_duration * 25)
+    
+    # Generate segments
+    segments = []
+    state = None
+    for i in range(num_segments):
+      wav, state = mrt.generate(
+        style=embedding, 
+        frames=frames_per_segment, 
+        state=state
+      )
+      segments.append(wav)
+      print(f"Generated segment {i+1}/{num_segments}")
+    
+    # Concatenate with crossfade
+    if len(segments) == 1:
+      full_wav = segments[0]
+    else:
+      full_wav = concatenate_with_crossfade(segments, crossfade_duration)
+    
+    # Save file
+    safe_filename = os.path.basename(filename)
+    if not safe_filename.endswith(".wav"):
+      safe_filename += ".wav"
+    output_path = _safe_path(safe_filename)
+    full_wav.write(output_path)
+    
+    return f"🎵 Long-form music generated successfully!\nDuration: {full_wav.seconds:.1f}s\nSaved to: {safe_filename}"
+    
+  except Exception as e:
+    import traceback
+    return f"❌ Streaming music generation failed:\n{str(e)}\n{traceback.format_exc()}"
+
+
+# ========== 音乐播放工具（pygame）==========
+def _ensure_pygame_initialized():
+    """确保 pygame mixer 已初始化"""
+    global _pygame_initialized
+    if not _pygame_initialized:
+        try:
+            import pygame
+            pygame.mixer.init()
+            _pygame_initialized = True
+        except ImportError:
+            return False, "pygame not installed. Please install it with: pip install pygame"
+        except Exception as e:
+            return False, f"Failed to initialize pygame: {str(e)}"
+    return True, None
+
+
+def play_music(filename: str, loops: int = 0, volume: float = 1.0) -> str:
+    """使用 pygame 播放音乐（支持 WAV、MP3、OGG 等格式）"""
+    # 初始化 pygame
+    ok, err = _ensure_pygame_initialized()
+    if not ok:
+        return f"❌ {err}"
+    
+    try:
+        import pygame
+        
+        # 安全路径检查
+        audio_path = _safe_path(filename)
+        if not os.path.exists(audio_path):
+            return f"❌ 文件不存在：{filename}"
+        
+        # 加载并播放音乐
+        pygame.mixer.music.load(audio_path)
+        pygame.mixer.music.set_volume(max(0.0, min(1.0, volume)))
+        pygame.mixer.music.play(loops=loops)
+        
+        return f"🎵 正在播放：{filename} (loops={loops}, volume={volume:.2f})"
+    except Exception as e:
+        import traceback
+        return f"❌ 播放失败：{str(e)}\n{traceback.format_exc()}"
+
+
+def pause_music() -> str:
+    """暂停当前播放的音乐"""
+    ok, err = _ensure_pygame_initialized()
+    if not ok:
+        return f"❌ {err}"
+    
+    try:
+        import pygame
+        pygame.mixer.music.pause()
+        return "⏸️ 音乐已暂停"
+    except Exception as e:
+        return f"❌ 暂停失败：{str(e)}"
+
+
+def unpause_music() -> str:
+    """继续播放暂停的音乐"""
+    ok, err = _ensure_pygame_initialized()
+    if not ok:
+        return f"❌ {err}"
+    
+    try:
+        import pygame
+        pygame.mixer.music.unpause()
+        return "▶️ 音乐已继续"
+    except Exception as e:
+        return f"❌ 继续播放失败：{str(e)}"
+
+
+def stop_music() -> str:
+    """停止音乐播放"""
+    ok, err = _ensure_pygame_initialized()
+    if not ok:
+        return f"❌ {err}"
+    
+    try:
+        import pygame
+        pygame.mixer.music.stop()
+        return "⏹️ 音乐已停止"
+    except Exception as e:
+        return f"❌ 停止失败：{str(e)}"
+
+
+def set_music_volume(volume: float) -> str:
+    """设置音乐播放音量"""
+    ok, err = _ensure_pygame_initialized()
+    if not ok:
+        return f"❌ {err}"
+    
+    try:
+        import pygame
+        # 确保音量在 0.0 到 1.0 之间
+        clamped_volume = max(0.0, min(1.0, volume))
+        pygame.mixer.music.set_volume(clamped_volume)
+        return f"🔊 音量已设置为：{clamped_volume:.2f}"
+    except Exception as e:
+        return f"❌ 设置音量失败：{str(e)}"
+
+
+# 函数映射表：函数名 -&gt; 函数对象（供动态调用）
 FUNCTIONS = {
     "add": add,
     "sub": sub,
@@ -654,4 +1104,12 @@ FUNCTIONS = {
     "list_reminders": list_reminders,
     "initialize_character": initialize_character,
     "introduce_myself": introduce_myself,
+    #"generate_music": generate_music,
+    "generate_music_streaming": generate_music_streaming,
+    #"init_music_models": init_music_models,
+    "play_music": play_music,
+    "pause_music": pause_music,
+    "unpause_music": unpause_music,
+    "stop_music": stop_music,
+    "set_music_volume": set_music_volume,
 }

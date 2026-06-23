@@ -1,7 +1,11 @@
 import os
+import sys
 import json
 from openai import OpenAI
 from tools import FUNCTIONS, TOOLS_SCHEMA  # 从独立模块导入工具函数和 schema
+
+# 强制刷新输出，确保在终端能立即看到
+print("🟢 toolkit_agent.py 正在启动...", flush=True)
 
 # ========== 配置区（通过环境变量设置，不要把密钥写死在代码里） ==========
 # 示例（把这些写在终端里，或者写个 .env 文件）:
@@ -85,15 +89,17 @@ def _trim_history():
 def chat(user_input: str) -> str:
     """
     主对话函数：支持多轮工具调用（多步推理）与上下文记忆
-    流程：用户输入 -> 循环：{模型判断是否调工具 -> 执行 -> 回传结果} -> 返回自然语言回答
+    流程：用户输入 -&gt; 循环：{模型判断是否调工具 -&gt; 执行 -&gt; 回传结果} -&gt; 返回自然语言回答
     """
     global messages
     # 追加用户消息到全局历史，而不是每次重建
     messages.append({"role": "user", "content": user_input})
     _trim_history()
 
-    max_rounds = 100  # 防止无限循环
-    for _ in range(max_rounds):
+    max_rounds = 10  # 防止无限循环
+    for round_num in range(max_rounds):
+        #print(f"\n第 {round_num + 1} 轮", flush=True)
+        
         # 调用模型：让它决定是否需要调用工具
         response = client.chat.completions.create(
             model=MODEL,
@@ -137,6 +143,8 @@ def chat(user_input: str) -> str:
             except json.JSONDecodeError:
                 func_args = {}
 
+            print(f"  [工具调用] {func_name}({func_args})", flush=True)
+
             # 本地执行函数
             func = FUNCTIONS.get(func_name)
             if func:
@@ -146,6 +154,8 @@ def chat(user_input: str) -> str:
                     result = f"Error: {e}"
             else:
                 result = f"Error: unknown function '{func_name}'"
+
+            print(f"  [执行结果] {result}", flush=True)
 
             # 把函数结果回传给模型（继续下一轮循环，模型会用这些结果继续推理）
             messages.append({
@@ -163,25 +173,35 @@ def chat(user_input: str) -> str:
 
 
 if __name__ == "__main__":
+    #print("🟡 正在检查 API_KEY...", flush=True)
     if not API_KEY:
-        print("⚠️ 请先设置环境变量 API_KEY 再运行。")
-        print("示例:")
-        print("export API_KEY=sk-xxxxxxxxxxxxxxxx")
-        print("python3 toolkit_agent.py")
+        print("⚠️ 请先设置环境变量 API_KEY 再运行。", flush=True)
+        print("示例:", flush=True)
+        print("export API_KEY=sk-xxxxxxxxxxxxxxxx", flush=True)
+        print("python3 toolkit_agent.py", flush=True)
         exit(1)
 
+    #print("🟡 API_KEY 检查通过，正在初始化...", flush=True)
+
     # 初始化林离
+    #print("林离已初始化。", flush=True)
     from tools import initialize_character
     initialize_character()
-
+    #print("林离已连接。今天有什么想聊聊的吗？", flush=True)
+    
     # 启动界面简洁干净
-    while True:
-        user_msg = input("你: ")
-        if user_msg.lower() in ["quit", "exit", "q"]:
-            print("再见。")
-            break
-        try:
-            answer = chat(user_msg)
-            print(f"林离: {answer}\n")
-        except Exception as e:
-            print(f"❌ 出错了: {e}\n")
+    try:
+        while True:
+            user_msg = input("你: ")
+            if user_msg.lower() in ["quit", "exit", "q"]:
+                print("再见。", flush=True)
+                break
+            try:
+                answer = chat(user_msg)
+                print(f"林离: {answer}\n", flush=True)
+            except Exception as e:
+                print(f"❌ 出错了: {e}\n", flush=True)
+                import traceback
+                traceback.print_exc()
+    except KeyboardInterrupt:
+        print("\n再见。", flush=True)
