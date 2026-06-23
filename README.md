@@ -294,4 +294,6 @@ python3 game_gui.py
 
 ## 📝 开源协议 / License
 
-MIT
+[Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License](LICENSE)
+
+**禁止商用** - 您可以自由使用、复制、修改和分享本项目，但不得用于商业目的。修改后的作品必须以相同许可证发布。
