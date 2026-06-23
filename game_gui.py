@@ -218,146 +218,56 @@ class CharacterSprite:
         self.width = width
         self.height = height
         self.panel = PixelPanel(x, y, width, height, "林离")
-        self.pixel_art = self._create_pixel_art()
+        self.pixel_art = self._load_character_image()
         self.font = PixelFont()
         self.is_thinking = False
         self.think_timer = 0
     
-    def _create_pixel_art(self):
-        img = pygame.Surface((240, 320), pygame.SRCALPHA)
+    def _load_character_image(self):
+        image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "images", "olivia.png")
+        
+        if os.path.exists(image_path):
+            try:
+                img = pygame.image.load(image_path).convert_alpha()
+                img_width, img_height = img.get_size()
+                
+                scale_w = self.width / img_width
+                scale_h = self.height / img_height
+                scale = min(scale_w, scale_h)
+                
+                new_width = int(img_width * scale)
+                new_height = int(img_height * scale)
+                
+                return pygame.transform.smoothscale(img, (new_width, new_height))
+            except Exception as e:
+                print(f"加载图片失败: {e}")
+        
+        return self._create_fallback_art()
+    
+    def _create_fallback_art(self):
+        img = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         img.fill((0, 0, 0, 0))
         
-        HAIR_DARK = (70, 45, 95)
-        HAIR_MID = (100, 65, 130)
-        HAIR_LIGHT = (130, 90, 165)
-        SKIN = (255, 235, 220)
-        SKIN_DARK = (240, 215, 195)
-        EYES = (45, 30, 65)
-        EYE_HIGHLIGHT = (255, 255, 255)
-        BLUSH = (255, 185, 195)
-        LIP = (230, 130, 150)
-        DRESS_DARK = (100, 120, 160)
-        DRESS_MID = (130, 155, 195)
-        DRESS_LIGHT = (165, 190, 225)
-        ACCENT = (180, 140, 200)
+        center_x = self.width // 2
+        center_y = self.height // 2
         
-        # 背景光晕
-        for i in range(20):
-            alpha = max(0, 40 - i * 2)
-            pygame.draw.circle(img, (100, 80, 120, alpha), (120, 160), 100 - i * 5)
+        pygame.draw.circle(img, (255, 235, 220), (center_x, center_y), 60)
         
-        # 头发 - 左侧长发
-        pygame.draw.rect(img, HAIR_DARK, (40, 80, 30, 180))
-        pygame.draw.rect(img, HAIR_MID, (55, 80, 15, 180))
-        pygame.draw.rect(img, HAIR_LIGHT, (65, 85, 10, 170))
+        pygame.draw.rect(img, (30, 25, 35), (center_x - 80, center_y - 50, 160, 120))
         
-        # 头发 - 右侧长发
-        pygame.draw.rect(img, HAIR_DARK, (170, 80, 30, 180))
-        pygame.draw.rect(img, HAIR_MID, (170, 80, 15, 180))
-        pygame.draw.rect(img, HAIR_LIGHT, (170, 85, 8, 170))
+        pygame.draw.rect(img, (240, 245, 255), (center_x - 35, center_y - 15, 12, 10))
+        pygame.draw.rect(img, (240, 245, 255), (center_x + 23, center_y - 15, 12, 10))
+        pygame.draw.rect(img, (60, 70, 90), (center_x - 32, center_y - 12, 6, 6))
+        pygame.draw.rect(img, (60, 70, 90), (center_x + 26, center_y - 12, 6, 6))
         
-        # 头发 - 头顶和刘海
-        pygame.draw.rect(img, HAIR_DARK, (60, 40, 120, 70))
-        pygame.draw.rect(img, HAIR_MID, (70, 50, 100, 50))
-        pygame.draw.rect(img, HAIR_LIGHT, (80, 55, 80, 30))
+        pygame.draw.rect(img, (255, 185, 195), (center_x - 40, center_y + 10, 8, 5))
+        pygame.draw.rect(img, (255, 185, 195), (center_x + 32, center_y + 10, 8, 5))
         
-        # 刘海细节
-        pygame.draw.rect(img, HAIR_DARK, (75, 90, 8, 20))
-        pygame.draw.rect(img, HAIR_DARK, (100, 95, 8, 18))
-        pygame.draw.rect(img, HAIR_DARK, (125, 92, 8, 20))
-        pygame.draw.rect(img, HAIR_DARK, (145, 88, 8, 22))
+        pygame.draw.rect(img, (230, 130, 150), (center_x - 8, center_y + 25, 16, 4))
         
-        # 脸部轮廓
-        pygame.draw.rect(img, SKIN, (85, 80, 70, 80))
-        
-        # 脸部阴影
-        pygame.draw.rect(img, SKIN_DARK, (85, 85, 8, 70))
-        pygame.draw.rect(img, SKIN_DARK, (147, 85, 8, 70))
-        
-        # 眼睛 - 白色
-        pygame.draw.rect(img, (240, 245, 255), (95, 95, 16, 12))
-        pygame.draw.rect(img, (240, 245, 255), (129, 95, 16, 12))
-        
-        # 眼睛 - 瞳孔
-        pygame.draw.rect(img, EYES, (100, 98, 8, 8))
-        pygame.draw.rect(img, EYES, (134, 98, 8, 8))
-        
-        # 眼睛高光
-        pygame.draw.rect(img, EYE_HIGHLIGHT, (101, 99, 3, 3))
-        pygame.draw.rect(img, EYE_HIGHLIGHT, (135, 99, 3, 3))
-        pygame.draw.rect(img, (200, 210, 230), (104, 102, 2, 2))
-        pygame.draw.rect(img, (200, 210, 230), (138, 102, 2, 2))
-        
-        # 眉毛
-        pygame.draw.rect(img, HAIR_DARK, (95, 88, 14, 3))
-        pygame.draw.rect(img, HAIR_DARK, (131, 88, 14, 3))
-        
-        # 鼻子
-        pygame.draw.rect(img, SKIN_DARK, (120, 112, 8, 6))
-        
-        # 嘴巴
-        pygame.draw.rect(img, LIP, (112, 128, 16, 5))
-        pygame.draw.rect(img, (255, 190, 200), (114, 128, 12, 3))
-        
-        # 腮红
-        pygame.draw.rect(img, BLUSH, (90, 115, 8, 6))
-        pygame.draw.rect(img, BLUSH, (142, 115, 8, 6))
-        
-        # 耳朵
-        pygame.draw.rect(img, SKIN, (80, 100, 8, 15))
-        pygame.draw.rect(img, SKIN, (152, 100, 8, 15))
-        
-        # 连衣裙 - 上身
-        pygame.draw.rect(img, DRESS_DARK, (85, 160, 70, 60))
-        
-        # 连衣裙 - 褶皱
-        pygame.draw.rect(img, DRESS_MID, (95, 165, 8, 50))
-        pygame.draw.rect(img, DRESS_MID, (115, 165, 8, 50))
-        pygame.draw.rect(img, DRESS_MID, (135, 165, 8, 50))
-        
-        # 连衣裙 - 领口
-        pygame.draw.rect(img, DRESS_LIGHT, (105, 160, 30, 8))
-        
-        # 蝴蝶结装饰
-        pygame.draw.rect(img, ACCENT, (115, 155, 10, 8))
-        pygame.draw.rect(img, ACCENT, (110, 160, 6, 10))
-        pygame.draw.rect(img, ACCENT, (124, 160, 6, 10))
-        
-        # 连衣裙 - 裙摆
-        pygame.draw.rect(img, DRESS_DARK, (75, 220, 90, 80))
-        
-        # 裙摆波浪
-        for i in range(5):
-            pygame.draw.rect(img, DRESS_MID, (80 + i * 18, 220, 12, 5))
-        
-        # 裙摆褶皱
-        pygame.draw.rect(img, DRESS_MID, (85, 230, 5, 60))
-        pygame.draw.rect(img, DRESS_MID, (115, 230, 5, 60))
-        pygame.draw.rect(img, DRESS_MID, (145, 230, 5, 60))
-        
-        # 手臂 - 左侧
-        pygame.draw.rect(img, SKIN, (70, 170, 15, 60))
-        pygame.draw.rect(img, SKIN_DARK, (70, 175, 6, 50))
-        
-        # 手臂 - 右侧
-        pygame.draw.rect(img, SKIN, (155, 170, 15, 60))
-        pygame.draw.rect(img, SKIN_DARK, (164, 175, 6, 50))
-        
-        # 手
-        pygame.draw.rect(img, SKIN, (68, 225, 18, 10))
-        pygame.draw.rect(img, SKIN, (154, 225, 18, 10))
-        
-        # 头发装饰 - 发夹
-        pygame.draw.rect(img, ACCENT, (150, 60, 15, 8))
-        pygame.draw.rect(img, (255, 240, 200), (152, 62, 11, 4))
-        
-        # 背景星星装饰
-        stars = [
-            (30, 50), (210, 60), (40, 280), (200, 290),
-            (20, 180), (220, 170), (50, 120), (190, 130)
-        ]
-        for x, y in stars:
-            pygame.draw.rect(img, (200, 180, 220, 100), (x, y, 3, 3))
+        pygame.draw.rect(img, (245, 240, 235), (center_x - 50, center_y + 45, 100, 80))
+        pygame.draw.rect(img, (150, 155, 165), (center_x - 80, center_y + 45, 30, 80))
+        pygame.draw.rect(img, (150, 155, 165), (center_x + 50, center_y + 45, 30, 80))
         
         return img
     
@@ -501,10 +411,36 @@ class GameGUI:
         
         pygame.quit()
 
-if __name__ == "__main__":
+def check_environment():
+    errors = []
+    
     if not API_KEY:
-        print("请先设置环境变量 API_KEY")
-        print("示例: export API_KEY=sk-xxxxxxxxxxxxxxxx")
+        errors.append("❌ API_KEY 未设置，请在 run.sh 中配置")
+    
+    packages = ["openai", "pygame", "numpy", "magenta_rt"]
+    for pkg in packages:
+        try:
+            __import__(pkg)
+        except ImportError:
+            errors.append(f"❌ 缺少 Python 包: {pkg} (请运行: pip install {pkg})")
+    
+    magenta_path = os.path.expanduser("~/Documents/Magenta/magenta-rt-v2")
+    if not os.path.exists(magenta_path):
+        errors.append(f"❌ Magenta 模型目录不存在: {magenta_path}")
+    else:
+        model_path = os.path.join(magenta_path, "models", "mrt2_small")
+        if not os.path.exists(model_path):
+            errors.append(f"❌ mrt2_small 模型不存在: {model_path}")
+    
+    return errors
+
+if __name__ == "__main__":
+    errors = check_environment()
+    
+    if errors:
+        print("环境检查失败，缺少以下组件：")
+        for error in errors:
+            print(f"  {error}")
         sys.exit(1)
     
     gui = GameGUI()
