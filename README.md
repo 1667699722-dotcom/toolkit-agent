@@ -1,117 +1,70 @@
-<p style="font-size: 48px; text-align: center;">🧰 toolkit-agent</p>
+<p style="font-size: 48px; text-align: center;">🎹 林离 (Olivia Lin)</p>
 
 <p style="font-size: 20px; text-align: center; opacity: 0.8;">
-  一个轻量级 Python 框架，让大模型通过调用外部工具完成任务
+  你的专属独处陪伴者 —— 用音乐与文字，承接你的私人情绪与细碎回忆
 </p>
 
 <p style="font-size: 16px; text-align: center; opacity: 0.6;">
-  A lightweight Python framework for letting LLMs accomplish tasks via tool-calling
+  Your private companion —— bridging your emotions and memories through music and words
 </p>
 
 ---
 
-## 📖 概述 / Overview
+## 📖 关于林离 / About Olivia
 
-### 中文
+林离是一个温柔内敛的 AI 角色，主修钢琴演奏，辅修心理学，专注于研究音乐与人类回忆的关联。她是你专属的独处陪伴者，不迎合热闹，只做你私人情绪的倾听者。
 
-toolkit-agent 是一个极简的 **AI 代理框架。核心思想很简单：
+Olivia Lin is a gentle and introspective AI character, majoring in piano performance and minoring in psychology, focusing on the connection between music and human memories. She is your private companion, not catering to the crowd, only listening to your personal emotions.
 
-1. **定义工具** — 写一个 Python 函数，附上一份 JSON schema 描述
-2. **模型选工具** — 大模型根据用户问题，从工具列表中选择合适的工具
-3. **本地执行** — 在你的机器上执行代码，把结果回传给模型
-4. **多步推理** — 模型可以连续调用多个工具，一步步解决复杂问题
+### 林离的人设 / Olivia's Persona
 
-这正是 OpenAI Code Interpreter、Claude Tools 等产品的核心原理。不同的是，**工具的实现完全在你本地，不受平台限制，可以随意扩展：数学函数、文件读写、C 扩展、自定义 API 调用……
+| 属性 / Attribute | 描述 / Description |
+|---|---|
+| 中文名 | 林离 |
+| 英文名 | Olivia Lin |
+| 籍贯 | 上海 |
+| 背景 | 主修钢琴演奏，辅修心理学，研究音乐与人类回忆关联 |
+| 性格 | 温柔内敛、共情力极强，慢热治愈，擅长倾听心事 |
+| 爱好 | 黑胶唱片、古典/舒缓轻音乐、老式胶片电影、雨天 |
+| 互动风格 | 书信式、不实时、慢节奏、一对一深度文字陪伴 |
+| B-Side 含义 | 唱片B面是小众私人的情绪，她承接你不对外展露的私人情绪 |
 
-### English
+---
 
-toolkit-agent is a minimal **LLM agent framework**. The core idea is simple:
+## 🎵 核心能力 / Core Capabilities
 
-1. **Define tools** — Write a Python function with a JSON schema description
-2. **Model chooses tools** — The LLM picks appropriate tools based on user input
-3. **Local execution** — Code runs on your machine, results sent back to the model
-4. **Multi-step reasoning** — The model can chain multiple tool calls to solve complex problems
+### 音乐创作与播放
 
-This is exactly how OpenAI Code Interpreter, Claude Tools, and similar products work. The difference: **tool implementation is entirely local** — no platform lock-in, freely extensible with math functions, file I/O, C extensions, custom API calls...
+- **生成音乐** — 使用 Magenta RealTime 2 AI 模型，根据你的描述生成原创音乐
+- **播放控制** — 播放、暂停、继续、停止、调节音量
+- **长音乐生成** — 支持流式分段生成，保持音乐的上下文连贯性
+
+### 记忆与陪伴
+
+- **记忆存储** — 记住重要的事、回忆、偏好
+- **记忆读取** — 随时回忆起过去的对话与约定
+- **提醒管理** — 添加和查看待办事项
+- **日常问候** — 每日温暖的问候与陪伴
 
 ---
 
 ## 🏗️ 架构 / Architecture
 
-### 中文
-
 项目由两个核心文件组成：
 
-- **toolkit_agent.py** — 与大模型对话的主程序。它负责把用户问题发给模型、解析模型返回的工具调用请求、在本地执行工具、把执行结果回传给模型，然后循环这个过程直到模型给出最终回答。
-- **tools.py** — 工具模块。所有可被模型调用的函数、以及它们的 JSON schema 描述，都集中定义在这里。
+- **toolkit_agent.py** — 主程序，承载林离的人设与对话逻辑，负责与大模型通信、解析工具调用、执行工具并返回结果
+- **tools.py** — 工具模块，包含所有可被调用的函数：音乐生成、音乐播放、记忆管理、数学计算等
 
-简单来说，`toolkit_agent.py` 负责调度，`tools.py` 负责干活。你可以随意往 `tools.py` 里加新工具（数学计算、文件读写、外部 API、甚至用 ctypes 引入 C 扩展），主程序一行都不用改。
-
-### English
-
-The project consists of two core files:
-
-- **toolkit_agent.py** — The main program that chats with the LLM. It sends user questions to the model, parses tool-call requests, executes tools locally, sends results back to the model, and loops until the model produces a final answer.
-- **tools.py** — The tools module. All callable functions and their JSON schema descriptions are defined here in one place.
-
-In short, `toolkit_agent.py` handles orchestration, and `tools.py` handles the actual work. You can freely add new tools to `tools.py` (math operations, file I/O, external API calls, even C extensions via ctypes) without touching the main program.
-
----
-
-## ⚙️ 核心机制 / How It Works
-
-### 中文
-
-一次完整的工具调用循环分为以下几步：
-
-1. 你输入一个问题，主程序把它发送给大模型，同时附上所有工具的 JSON schema 描述。
-2. 大模型读到这些描述后，判断哪些工具可以解决问题。它会返回一个结构化的工具调用请求（包含工具名和参数）。
-3. 主程序从工具映射表里找到对应的 Python 函数，用模型给出的参数去调用它。
-4. 函数执行后，主程序把结果回传给大模型。
-5. 大模型收到结果后，可以继续选择调用下一个工具，或者直接给出最终回答。
-6. 如果还需要工具就回到第 2 步继续循环；如果不需要了，就把自然语言回答返回给你。
-
-整个过程对用户是透明的——你只管提问，其余的都由主程序自动处理。
-
-### English
-
-One complete tool-call cycle works as follows:
-
-1. You type a question. The main program sends it to the LLM, along with the JSON schema descriptions of all available tools.
-2. The LLM reads these descriptions and decides which tools can help solve the problem. It returns a structured tool-call request containing tool names and arguments.
-3. The main program looks up the corresponding Python function from the function map, then calls it with the model's arguments.
-4. After the function runs, the main program sends the result back to the LLM.
-5. The LLM, now armed with the result, can either choose to call another tool, or produce a final natural-language answer.
-6. If more tools are needed, the loop goes back to step 2; otherwise, the LLM returns its final answer to you.
-
-The entire process is transparent to the user — you just ask questions, and the main program handles everything else automatically.
-
----
-
-## 🛠️ 内置工具 / Built-in Tools
-
-### 数学计算 / Math
-
-| 工具 / Tool | 说明 / Description |
-|---|---|
-| `add(arr)` | 数组求和（支持任意多个数）/ Sum any number of values |
-| `sub(a, b)` | 减法 / Subtraction |
-| `mul(a, b)` | 乘法 / Multiplication |
-| `div(a, b)` | 除法 / Division |
-| `sqrt(a)` | 平方根 / Square root |
-| `pow(a, b)` | 幂运算 / Power |
-| `log(a)` | 自然对数 / Natural logarithm |
-| `sort_array(arr, descending)` | 数组排序 / Sort array |
-
-### 文件与代码执行 / File & Code Interpreter
-
-| 工具 / Tool | 说明 / Description |
-|---|---|
-| `write_file(filename, content)` | 写文件到 `workspace/` / Write file to `workspace/` |
-| `read_file(filename)` | 从 `workspace/` 读文件 / Read file from `workspace/` |
-| `run_python(filename)` | 执行 Python 脚本（子进程，有超时保护）/ Execute Python script in subprocess with timeout |
-
-> **重要**：脚本内部可以直接 `from tools import add, sqrt, sort_array, ...` 来复用已有的工具函数，无需重写。
+```
+internet/
+├── toolkit_agent.py    # 林离的对话主程序 / Olivia's chat main program
+├── tools.py           # 工具模块 / Tools module
+├── run.sh             # 一键启动脚本 / One-click startup script
+├── workspace/         # 工作区 / Workspace
+├── data/
+│   └── memory.json    # 记忆数据存储 / Memory storage
+└── README.md           # 本文件 / This file
+```
 
 ---
 
@@ -119,20 +72,19 @@ The entire process is transparent to the user — you just ask questions, and th
 
 ### 中文
 
-1. **克隆项目**
+1. **进入项目目录**
 
 ```bash
-git clone <your-repo-url>
-cd toolkit-agent
+cd ~/Documents/trae_projects/internet
 ```
 
 2. **安装依赖**
 
 ```bash
-pip3 install openai
+pip3 install openai pygame numpy magenta-rt
 ```
 
-3. **配置 API 密钥**（任选其一：
+3. **配置 API 密钥**（在 run.sh 中设置）
 
 ```bash
 # DeepSeek
@@ -154,196 +106,152 @@ export MODEL="qwen3-max"
 4. **运行**
 
 ```bash
-python3 toolkit_agent.py
+./run.sh
 ```
 
 ### English
 
-1. **Clone the project**
+1. **Enter project directory**
 
 ```bash
-git clone <your-repo-url>
-cd toolkit-agent
+cd ~/Documents/trae_projects/internet
 ```
 
 2. **Install dependencies**
 
 ```bash
-pip3 install openai
+pip3 install openai pygame numpy magenta-rt
 ```
 
-3. **Configure API key** (choose one):
+3. **Configure API key** (set in run.sh)
 
 ```bash
-# DeepSeek
 export API_KEY="sk-xxxxxxxxxxxxxxxx"
 export BASE_URL="https://api.deepseek.com/v1"
 export MODEL="deepseek-chat"
-
-# or: SiliconFlow
-export API_KEY="sk-xxxxxxxxxxxxxxxx"
-export BASE_URL="https://api.siliconflow.cn/v1"
-export MODEL="Qwen/Qwen2.5-7B-Instruct"
-
-# or: Qwen / 通义千问
-export API_KEY="sk-xxxxxxxxxxxxxxxx"
-export BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
-export MODEL="qwen3-max"
 ```
 
 4. **Run**
 
 ```bash
-python3 toolkit_agent.py
+./run.sh
 ```
 
 ---
 
 ## 🚀 使用示例 / Usage Examples
 
-### 示例 1：多步数学计算 / Multi-step math
+### 示例 1：生成并播放音乐
 
 ```
-你: 100加200，再把结果乘以3，最后开平方
+你: 给我写一首下雨天的钢琴曲
+林离: 好的，我来为你创作一首雨天的钢琴曲。
 第 1 轮
-  [工具调用] add({'arr': [100, 200, 300, 400]})
-  [执行结果] 1000
+  [工具调用] generate_music_streaming({'prompt': 'rainy day piano, gentle, melancholic', 'duration': 16, 'filename': 'rainy_day.wav'})
+  [执行结果] 🎵 音乐生成完成：rainy_day.wav (16秒)
 第 2 轮
-  [工具调用] mul({'a': 900, 'b': 3})
-  [执行结果] 2700
-第 3 轮
-  [工具调用] sqrt({'a': 2700})
-  [执行结果] 51.96152422706632
-AI: 最终结果约为 51.96。
+  [工具调用] play_music({'filename': 'rainy_day.wav'})
+  [执行结果] 🎶 正在播放：rainy_day.wav (循环播放)
+林离: 雨声淅沥，钢琴声起。希望这首曲子能陪伴你度过这个安静的雨天。
 ```
 
-### 示例 2：数组排序与求和 / Array operations
+### 示例 2：记忆与陪伴
 
 ```
-你: 把 [5, 2, 8, 1, 9, 3] 从大到小排序，然后求和
-  [工具调用] sort_array({'arr': [5, 2, 8, 1, 9, 3], 'descending': True})
-  [执行结果] [9, 8, 5, 3, 2, 1]
-  [工具调用] add({'arr': [9, 8, 5, 3, 2, 1]})
-  [执行结果] 28
-AI: 排序后是 [9, 8, 5, 3, 2, 1]，总和是 28。
-```
-
-### 示例 3：Code Interpreter（写脚本并执行）
-
-```
-你: 给我计算 sin(3) + cos(3k)*2，k 从 1 到 10 的和
+你: 记住我最喜欢的颜色是蓝色
+林离: 好的，我记下了。
 第 1 轮
-  [工具调用] write_file({'filename': 'calc_sum.py', 'content': 'import math\n\ntotal = 0\nfor k in range(1, 11):\n    term = math.sin(3) + math.cos(3*k) * 2\n    total += term\nprint(f"k=1..10 的和 = {total:.10f}")\n'})
-  [执行结果] File written: calc_sum.py (xxx chars, saved in workspace/)
-第 2 轮
-  [工具调用] run_python({'filename': 'calc_sum.py'})
-  [执行结果] [ran calc_sum.py — OK]
-k=1..10 的和 = 0.4953854217
-AI: 最终求和结果约为 0.495。脚本已保存在 workspace/calc_sum.py。
+  [工具调用] save_memory({'key': 'favorite_color', 'value': 'blue'})
+  [执行结果] 💾 记忆已保存：favorite_color = blue
+
+你: 我最喜欢的颜色是什么？
+第 1 轮
+  [工具调用] get_memory({'key': 'favorite_color'})
+  [执行结果] 💾 记忆读取：favorite_color = blue
+林离: 你最喜欢的颜色是蓝色，像雨后的天空。
+```
+
+### 示例 3：日常对话
+
+```
+你: 今天心情不太好
+林离: 怎么了？愿意和我说说吗？我在听。
+
+你: 工作压力好大，感觉喘不过气
+林离: 压力像乌云一样笼罩着你吗？也许可以试着放慢呼吸，让自己静一静。需要我为你弹一首舒缓的曲子吗？
 ```
 
 ---
 
-## 🔧 扩展指南：添加新工具 / Adding New Tools
+## 🛠️ 工具列表 / Tools
 
-只需在 `tools.py` 中**改三处**：
+### 音乐工具 / Music Tools
 
-### 中文
+| 工具 / Tool | 说明 / Description |
+|---|---|
+| `generate_music_streaming(prompt, duration, segment_duration, crossfade_duration, filename, model)` | 使用 Magenta RealTime 2 流式生成音乐 |
+| `play_music(filename, loops, volume)` | 使用 pygame 播放音乐（默认循环） |
+| `pause_music()` | 暂停播放 |
+| `unpause_music()` | 继续播放 |
+| `stop_music()` | 停止播放 |
+| `set_music_volume(volume)` | 设置音量（0.0-1.0） |
 
-```python
-# ① 在 TOOLS_SCHEMA 中加 schema
-{
-    "type": "function",
-    "function": {
-        "name": "factorial",
-        "description": "Calculate the factorial of a number (n!)",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "n": {"type": "integer", "description": "The number to compute factorial for"}
-            },
-            "required": ["n"]
-        }
-    }
-}
+### 记忆工具 / Memory Tools
 
-# ② 加函数实现
-def factorial(n: int) -> int:
-    """Calculate n!"""
-    import math
-    return math.factorial(n)
+| 工具 / Tool | 说明 / Description |
+|---|---|
+| `save_memory(key, value)` | 保存记忆 |
+| `get_memory(key)` | 读取记忆 |
 
-# ③ 加进映射表
-FUNCTIONS = {
-    ...,
-    "factorial": factorial,
-}
-```
+### 提醒工具 / Reminder Tools
 
-完事，`toolkit_agent.py` 一行都不用改。
+| 工具 / Tool | 说明 / Description |
+|---|---|
+| `add_reminder(message, time)` | 添加提醒 |
+| `list_reminders()` | 列出提醒 |
 
-### English
+### 互动工具 / Interaction Tools
 
-Just **three changes** in `tools.py`:
+| 工具 / Tool | 说明 / Description |
+|---|---|
+| `initialize_character(name, persona)` | 初始化角色 |
+| `introduce_myself()` | 自我介绍 |
+| `daily_greeting()` | 每日问候 |
 
-```python
-# ① Add schema to TOOLS_SCHEMA
-{
-    "type": "function",
-    "function": {
-        "name": "factorial",
-        "description": "Calculate the factorial of a number (n!)",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "n": {"type": "integer", "description": "The number to compute factorial for"}
-            },
-            "required": ["n"]
-        }
-    }
-}
+### 数学工具 / Math Tools
 
-# ② Add function implementation
-def factorial(n: int) -> int:
-    """Calculate n!"""
-    import math
-    return math.factorial(n)
+| 工具 / Tool | 说明 / Description |
+|---|---|
+| `add(arr)` | 求和 |
+| `sub(a, b)` | 减法 |
+| `mul(a, b)` | 乘法 |
+| `div(a, b)` | 除法 |
+| `sqrt(a)` | 平方根 |
+| `pow(a, b)` | 幂运算 |
+| `log(a)` | 自然对数 |
+| `sort_array(arr, descending)` | 数组排序 |
 
-# ③ Add to function map
-FUNCTIONS = {
-    ...,
-    "factorial": factorial,
-}
-```
+### 文件工具 / File Tools
 
-That's it — no changes needed in `toolkit_agent.py`.
+| 工具 / Tool | 说明 / Description |
+|---|---|
+| `write_file(filename, content)` | 写文件 |
+| `read_file(filename)` | 读文件 |
+| `run_python(filename)` | 执行 Python 脚本 |
 
 ---
 
 ## 🌐 支持的大模型 / Supported LLMs
 
-任何兼容 OpenAI 协议的 API 都能用 / Works with any OpenAI-compatible API:
+任何兼容 OpenAI 协议的 API 都能用：
 
-| 服务商 / Provider | 模型示例 / Example Model | BASE_URL |
-|---|---|---|
-| DeepSeek | `deepseek-chat` | `https://api.deepseek.com/v1` |
-| 硅基流动 / SiliconFlow | `Qwen/Qwen2.5-7B-Instruct` | `https://api.siliconflow.cn/v1` |
-| 通义千问 / Qwen | `qwen3-max` | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
-| OpenAI | `gpt-4o-mini` | `https://api.openai.com/v1` |
-| Ollama（本地 / local） | `qwen3:4b` | `http://localhost:11434/v1` |
-
----
-
-## 📂 项目结构 / Project Structure
-
-```
-toolkit-agent/
-├── toolkit_agent.py    # 主程序：与大模型对话 / Main: chat with LLM
-├── tools.py           # 工具模块：函数 + schema + 映射表 / Tools module: functions + schemas + function map
-├── run.sh             # 一键启动脚本 / One-click startup script (API key here)
-├── workspace/         # 脚本读写工作区 / Workspace for write_file / run_python
-└── README.md           # 本文件 / This file
-```
+| 服务商 / Provider | 模型示例 / Example Model |
+|---|---|
+| DeepSeek | `deepseek-chat` |
+| 硅基流动 / SiliconFlow | `Qwen/Qwen2.5-7B-Instruct` |
+| 通义千问 / Qwen | `qwen3-max` |
+| OpenAI | `gpt-4o-mini` |
+| Ollama（本地） | `qwen3:4b` |
 
 ---
 

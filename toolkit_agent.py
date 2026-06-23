@@ -86,21 +86,30 @@ def _trim_history():
         messages = [messages[0]] + trimmed
 
 
+_log_callback = None
+
+def set_log_callback(callback):
+    global _log_callback
+    _log_callback = callback
+
+def _log(msg, type="info"):
+    if _log_callback:
+        _log_callback(msg, type)
+    print(msg, flush=True)
+
 def chat(user_input: str) -> str:
     """
     主对话函数：支持多轮工具调用（多步推理）与上下文记忆
-    流程：用户输入 -&gt; 循环：{模型判断是否调工具 -&gt; 执行 -&gt; 回传结果} -&gt; 返回自然语言回答
+    流程：用户输入 -> 循环：{模型判断是否调工具 -> 执行 -> 回传结果} -> 返回自然语言回答
     """
     global messages
-    # 追加用户消息到全局历史，而不是每次重建
     messages.append({"role": "user", "content": user_input})
     _trim_history()
-    print("AI思考中...")
-    max_rounds = 10  # 防止无限循环
+    _log("AI思考中...", "info")
+    max_rounds = 10
     for round_num in range(max_rounds):
-        #print(f"第 {round_num + 1} 轮 ", flush=True)
+        _log(f"第 {round_num + 1} 轮", "info")
         
-        # 调用模型：让它决定是否需要调用工具
         response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
@@ -109,16 +118,12 @@ def chat(user_input: str) -> str:
         )
         response_message = response.choices[0].message
 
-        # 如果模型没调用工具 → 直接回答，把 assistant 回复加入历史后返回
         if not response_message.tool_calls:
-            # 把 response_message 转成普通 dict 后追加
             if response_message.content:
                 messages.append({"role": "assistant", "content": response_message.content})
             _trim_history()
             return response_message.content or ""
 
-        # 有工具调用 → 先把模型的调用请求加入对话历史
-        # 注意：response_message.tool_calls 是对象列表，需要转成可序列化形式
         tool_calls_dict = []
         for tc in response_message.tool_calls:
             tool_calls_dict.append({
@@ -135,7 +140,6 @@ def chat(user_input: str) -> str:
             "tool_calls": tool_calls_dict,
         })
 
-        # 遍历所有工具调用，一个个执行
         for tool_call in response_message.tool_calls:
             func_name = tool_call.function.name
             try:
@@ -143,9 +147,8 @@ def chat(user_input: str) -> str:
             except json.JSONDecodeError:
                 func_args = {}
 
-            #print(f"  [工具调用] {func_name}({func_args})", flush=True)
+            _log(f"[工具调用] {func_name}({func_args})", "tool")
 
-            # 本地执行函数
             func = FUNCTIONS.get(func_name)
             if func:
                 try:
@@ -155,9 +158,8 @@ def chat(user_input: str) -> str:
             else:
                 result = f"Error: unknown function '{func_name}'"
 
-            print(f"  [执行结果] {result}", flush=True)
+            _log(f"[执行结果] {result}", "result")
 
-            # 把函数结果回传给模型（继续下一轮循环，模型会用这些结果继续推理）
             messages.append({
                 "role": "tool",
                 "tool_call_id": tool_call.id,
@@ -165,7 +167,6 @@ def chat(user_input: str) -> str:
             })
         _trim_history()
 
-    # 达到最大轮次，返回最后一次回答
     final_content = response_message.content or ""
     if final_content:
         messages.append({"role": "assistant", "content": final_content})
