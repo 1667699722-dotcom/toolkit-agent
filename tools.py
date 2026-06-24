@@ -332,6 +332,61 @@ TOOLS_SCHEMA = [
                 "required": ["volume"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "start_maze_game",
+            "description": "Start the maze game. This will open a new window with the maze.",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "maze_action",
+            "description": "Control the maze game character to move in a direction. Must be called after start_maze_game.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "direction": {
+                        "type": "string",
+                        "description": "Movement direction: 'up', 'down', 'left', or 'right'."
+                    }
+                },
+                "required": ["direction"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "stop_maze_game",
+            "description": "Stop and close the maze game.",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "start_maze_exploration",
+            "description": "Start automatic maze exploration. The AI will continuously analyze maze state and control the character to reach the end point (x=19, y=19).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "max_steps": {
+                        "type": "integer",
+                        "description": "Maximum number of exploration steps (default: 60)."
+                    }
+                }
+            }
+        }
     }
 ]
 
@@ -836,7 +891,191 @@ def set_music_volume(volume: float) -> str:
         return f"❌ 设置音量失败：{str(e)}"
 
 
-# 函数映射表：函数名 -&gt; 函数对象（供动态调用）
+# ========== 迷宫游戏相关函数 ==========
+_maze_process = None
+
+def start_maze_game() -> str:
+    global _maze_process
+    if _maze_process is not None and _maze_process.poll() is None:
+        return "迷宫游戏已在运行"
+    try:
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "maze_game.py")
+        _maze_process = subprocess.Popen([sys.executable, script_path], 
+                                        stdin=subprocess.PIPE, 
+                                        stdout=subprocess.PIPE, 
+                                        stderr=subprocess.PIPE,
+                                        text=True,
+                                        cwd=os.path.dirname(os.path.abspath(__file__)))
+        return "迷宫游戏已启动"
+    except Exception as e:
+        return f"启动失败：{str(e)}"
+
+def maze_action(direction: str) -> str:
+    try:
+        cmd_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "maze_command.json")
+        with open(cmd_file, 'w', encoding='utf-8') as f:
+            json.dump({"command": "move", "direction": direction}, f)
+        import time
+        time.sleep(0.2)
+        return f"已移动: {direction}"
+    except Exception as e:
+        return f"操作失败：{str(e)}"
+
+def stop_maze_game() -> str:
+    global _maze_process
+    if _maze_process is not None and _maze_process.poll() is None:
+        try:
+            cmd_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "maze_command.json")
+            with open(cmd_file, 'w', encoding='utf-8') as f:
+                json.dump({"command": "stop"}, f)
+            import time
+            time.sleep(0.5)
+            _maze_process.terminate()
+            _maze_process.wait(timeout=3)
+        except:
+            try:
+                _maze_process.kill()
+            except:
+                pass
+        _maze_process = None
+        return "迷宫游戏已停止"
+    return "迷宫游戏未运行"
+
+def get_maze_state():
+    json_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "maze_detected.json")
+    if not os.path.exists(json_file):
+        return None
+    try:
+        with open(json_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        return None
+
+_visited_path = []
+
+def create_survival_prompt(maze_data):
+    global _visited_path
+    
+    if not maze_data:
+        return "无法获取迷宫状态"
+    
+    pos = maze_data.get('player_position', {})
+    cells = maze_data.get('detected_cells', [])
+    
+    x, y = pos.get('x', 0), pos.get('y', 0)
+    
+    current_pos = (x, y)
+    if current_pos not in _visited_path:
+        _visited_path.append(current_pos)
+    
+    cell_map = {}
+    for cell in cells:
+        cx, cy = cell.get('x', 0), cell.get('y', 0)
+        cell_map[(cx, cy)] = cell
+    
+    directions_text = []
+    for dir_name, dx, dy in [("上", 0, -1), ("下", 0, 1), ("左", -1, 0), ("右", 1, 0)]:
+        check_x, check_y = x + dx, y + dy
+        cell = cell_map.get((check_x, check_y))
+        if cell:
+            z = cell.get('z', 1)
+            if z == 0:
+                status = "✅ 可通行"
+                if (check_x, check_y) in _visited_path:
+                    status += " ⚠️ 已访问过"
+                directions_text.append(f"{dir_name}: {status}")
+            else:
+                directions_text.append(f"{dir_name}: ❌ 墙壁")
+        else:
+            directions_text.append(f"{dir_name}: ❓ 未知区域")
+    
+    visited_str = " → ".join([f"({cx},{cy})" for cx, cy in _visited_path])
+    visited_count = len(_visited_path)
+    distance_to_end = abs(19 - x) + abs(19 - y)
+    
+    return f"""【迷宫探索任务】
+
+🚨 求生指令：必须到达终点！不要重复走已走过的路！
+
+🎯 终点坐标：(19, 19)
+📍 当前位置：({x}, {y})
+📏 距终点：{distance_to_end} 步
+
+📋 已走过的路径（共 {visited_count} 步）：
+{visited_str}
+
+⚠️ 绝对禁止：回到路径中已出现过的任何位置！
+
+🧭 四向探测：
+{chr(10).join(directions_text)}
+
+💡 决策规则：
+1. 优先选择 ❓ 未知区域
+2. 其次选择 ✅ 可通行且未访问过的方向
+3. 绝对不要进入 ⚠️ 已访问过的区域（除非其他方向全是墙壁）
+4. 整体趋势向终点方向（右、下）推进
+
+📊 迷宫数据 (JSON):
+{json.dumps(maze_data, ensure_ascii=False, indent=2)}
+
+🎮 立即调用 maze_action 工具：{{"direction": "up/down/left/right"}}
+"""
+
+def start_maze_exploration(max_steps: int = 60) -> str:
+    global _visited_path
+    _visited_path = []
+    
+    start_maze_game()
+    import time
+    time.sleep(2)
+    
+    for step in range(max_steps):
+        maze_data = get_maze_state()
+        if not maze_data:
+            time.sleep(1)
+            continue
+        
+        pos = maze_data.get('player_position', {})
+        x, y = pos.get('x', 0), pos.get('y', 0)
+        
+        if x == 19 and y == 19:
+            return f"🎉 到达终点！共用 {step + 1} 步"
+        
+        cell_map = {}
+        for cell in maze_data.get('detected_cells', []):
+            cx, cy = cell.get('x', 0), cell.get('y', 0)
+            cell_map[(cx, cy)] = cell
+        
+        valid_dirs = []
+        for dir_name, dx, dy in [("right", 1, 0), ("down", 0, 1), ("up", 0, -1), ("left", -1, 0)]:
+            check_x, check_y = x + dx, y + dy
+            cell = cell_map.get((check_x, check_y))
+            if cell and cell.get('z', 1) == 0 and (check_x, check_y) not in _visited_path:
+                valid_dirs.append(dir_name)
+        
+        if not valid_dirs:
+            for dir_name, dx, dy in [("right", 1, 0), ("down", 0, 1), ("up", 0, -1), ("left", -1, 0)]:
+                check_x, check_y = x + dx, y + dy
+                cell = cell_map.get((check_x, check_y))
+                if cell and cell.get('z', 1) == 0:
+                    valid_dirs.append(dir_name)
+        
+        if valid_dirs:
+            if "right" in valid_dirs and x < 19:
+                direction = "right"
+            elif "down" in valid_dirs and y < 19:
+                direction = "down"
+            else:
+                direction = valid_dirs[0]
+            _visited_path.append((x + (1 if direction == "right" else -1 if direction == "left" else 0), 
+                                 y + (1 if direction == "down" else -1 if direction == "up" else 0)))
+            maze_action(direction)
+            time.sleep(0.3)
+    
+    return f"探索结束。位置：({x}, {y})"
+
+
+# 函数映射表：函数名 -> 函数对象（供动态调用）
 FUNCTIONS = {
     "write_file": write_file,
     "read_file": read_file,
@@ -848,12 +1087,14 @@ FUNCTIONS = {
     "list_reminders": list_reminders,
     "initialize_character": initialize_character,
     "introduce_myself": introduce_myself,
-    #"generate_music": generate_music,
     "generate_music_streaming": generate_music_streaming,
-    #"init_music_models": init_music_models,
     "play_music": play_music,
     "pause_music": pause_music,
     "unpause_music": unpause_music,
     "stop_music": stop_music,
     "set_music_volume": set_music_volume,
+    "start_maze_game": start_maze_game,
+    "maze_action": maze_action,
+    "stop_maze_game": stop_maze_game,
+    "start_maze_exploration": start_maze_exploration,
 }

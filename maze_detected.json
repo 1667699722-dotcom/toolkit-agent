@@ -1,0 +1,24 @@
+{
+  "__metadata": {
+    "description": "\u8ff7\u5bab\u6e38\u620f\u6570\u636e\uff0c\u7528\u4e8eAI\u64cd\u63a7\u89d2\u8272\u63a2\u7d22\u8ff7\u5bab",
+    "coordinate_system": "\u5e73\u9762\u76f4\u89d2\u5750\u6807\u7cfb\uff0c(0,0)\u5728\u5de6\u4e0a\u89d2\uff0cx\u8f74\u5411\u53f3\uff0cy\u8f74\u5411\u4e0b",
+    "cell_states": {
+      "0": "\u53ef\u901a\u884c\u8def\u5f84\uff0c\u89d2\u8272\u53ef\u4ee5\u79fb\u52a8\u5230\u6b64\u4f4d\u7f6e",
+      "1": "\u5899\u58c1/\u969c\u788d\uff0c\u89d2\u8272\u65e0\u6cd5\u901a\u8fc7"
+    },
+    "movement_directions": {
+      "up": "y-1\uff0c\u5411\u4e0a\u79fb\u52a8",
+      "down": "y+1\uff0c\u5411\u4e0b\u79fb\u52a8",
+      "left": "x-1\uff0c\u5411\u5de6\u79fb\u52a8",
+      "right": "x+1\uff0c\u5411\u53f3\u79fb\u52a8"
+    },
+    "goal": "\u5230\u8fbe\u7ea2\u8272\u7ec8\u70b9 (x=19, y=19)"
+  },
+  "player_position": {
+    "__description": "\u73a9\u5bb6\u5f53\u524d\u4f4d\u7f6e\u5750\u6807",
+    "x": 11,
+    "y": 3
+  },
+  "detected_cells": [],
+  "total_detected": 0
+}
